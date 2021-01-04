@@ -82,6 +82,8 @@ class DecoderLayer(nn.Module):
 
         """
         residual = tgt
+        # import pdb
+        # pdb.set_trace()
         if self.normalize_before:
             tgt = self.norm1(tgt)
 
