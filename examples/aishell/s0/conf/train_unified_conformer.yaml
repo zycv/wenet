@@ -18,6 +18,8 @@ encoder_conf:
     selfattention_layer_type: 'rel_selfattn'
     causal: true
     use_dynamic_chunk: true
+    cnn_module_norm: 'layer_norm' # using nn.LayerNorm makes model converge faster
+    use_dynamic_left_chunk: false
 
 # decoder related
 decoder: transformer
@@ -44,7 +46,7 @@ raw_wav: true
 collate_conf:
     # waveform level config
     wav_distortion_conf:
-        wav_dither: 1.0 # x means x/32768.0 in torchaudio
+        wav_dither: 1.0
         wav_distortion_rate: 0.0
         distortion_methods: []
     speed_perturb: true
@@ -71,12 +73,13 @@ dataset_conf:
     max_length: 40960
     min_length: 0
     batch_type: 'static' # static or dynamic
-    batch_size: 20
+    # the size of batch_size should be set according to your gpu memory size, here we used 2080ti gpu whose memory size is 11GB
+    batch_size: 16
     sort: true
 
 grad_clip: 5
 accum_grad: 1
-max_epoch: 80
+max_epoch: 180
 log_interval: 100
 
 optim: adam

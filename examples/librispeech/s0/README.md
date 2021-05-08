@@ -1,46 +1,39 @@
-# ASR Benchmark Results on LibriSpeech
+# Performance Record
 
-## Standard E2E Results
+## Conformer Result
 
-Conformer without speed perpurb and lm
-* config: conf/train_conformer_large.yaml
-* beam: 10
-* num of gpu: 8
-* num of averaged model: 20
-* ctc weight (used for attention rescoring): 0.5
+* Feature info: using fbank feature, cmvn, dither
+* Training info: train_conformer.yaml, kernel size 31, lr 0.004, batch size 12, 8 gpu, acc_grad 4, 120 epochs, dither 0.1
+* Decoding info: ctc_weight 0.5, average_num 30
+* Git hash: 90d9a559840e765e82119ab72a11a1f7c1a01b78
+* Model link: http://mobvoi-speech-public.ufile.ucloud.cn/public/wenet/librispeech/20210216_conformer_exp.tar.gz
 
-test clean (chunk size = full)
-| decoding mode            | WER  |
-|--------------------------|------|
-| attention rescoring      | 2.85 |
-
-test other (chunk size = full)
-| decoding mode            | WER  |
-|--------------------------|------|
-| attention rescoring      | 7.24 |
+| decoding mode            | test clean | test other |
+|--------------------------|------------|------------|
+| ctc greedy search        | 3.51       | 9.57       |
+| ctc prefix beam search   | 3.51       | 9.56       |
+| attention decoder        | 3.05       | 8.72       |
+| attention rescoring      | 3.18       | 8.36       |
 
 
-## Unified Dynamic Chunk Results
+## Conformer U2 Result
 
-Conformer (causal convolution)
-* config: conf/train_unified_conformer.yaml
-* beam: 10
-* num of gpu: 8
-* ctc weight (used for attention rescoring): 0.5
-* num of averaged model: 30
+* Feature info: using fbank feature, cmvn, speed perturb, dither
+* Training info: train_unified_conformer.yaml lr 0.001, batch size 10, 8 gpu, acc_grad 1, 120 epochs, dither 1.0
+* Decoding info: ctc_weight 0.5, average_num 30
+* Git hash: 90d9a559840e765e82119ab72a11a1f7c1a01b78
+* Model link: http://mobvoi-speech-public.ufile.ucloud.cn/public/wenet/librispeech/20210215_unified_conformer_exp.tar.gz
 
 test clean
-| decoding mode/chunk size | full | 16   |
+| decoding mode            | full | 16   |
 |--------------------------|------|------|
-| attention decoder        | 5.17 | 5.21 |
-| ctc greedy search        | 3.99 | 4.74 |
-| ctc prefix beam search   | 3.99 | 4.74 |
-| attention rescoring      | 3.39 | 3.94 |
+| ctc prefix beam search   | 4.26 | 5.00 |
+| attention decoder        | 3.05 | 3.44 |
+| attention rescoring      | 3.72 | 4.10 |
 
 test other
-| decoding mode/chunk size | full | 16    |
-|--------------------------|------|-------|
-| attention decoder        | 9.41 | 10.75 |
-| ctc greedy search        | 9.80 | 11.86 |
-| ctc prefix beam search   | 9.80 | 11.85 |
-| attention rescoring      | 8.64 | 10.52 |
+| decoding mode            | full  | 16    |
+|--------------------------|-------|-------|
+| ctc prefix beam search   | 10.87 | 12.87 |
+| attention decoder        | 9.07  | 10.44 |
+| attention rescoring      | 9.74  | 11.61 |

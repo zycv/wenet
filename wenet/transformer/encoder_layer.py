@@ -22,14 +22,13 @@ class TransformerEncoderLayer(nn.Module):
         feed_forward (torch.nn.Module): Feed-forward module instance.
             `PositionwiseFeedForward`, instance can be used as the argument.
         dropout_rate (float): Dropout rate.
-        normalize_before (bool): Whether to use layer_norm before the first
-            block.
+        normalize_before (bool):
+            True: use layer_norm before each sub-block.
+            False: to use layer_norm after each sub-block.
         concat_after (bool): Whether to concat attention layer's input and
             output.
-            if True, additional linear will be applied.
-                i.e. x -> x + linear(concat(x, att(x)))
-            if False, no additional linear will be applied.
-                i.e. x -> x + att(x)
+            True: x -> x + linear(concat(x, att(x)))
+            False: x -> x + att(x)
 
     """
     def __init__(
@@ -60,6 +59,7 @@ class TransformerEncoderLayer(nn.Module):
         x: torch.Tensor,
         mask: torch.Tensor,
         pos_emb: torch.Tensor,
+        mask_pad: Optional[torch.Tensor] = None,
         output_cache: Optional[torch.Tensor] = None,
         cnn_cache: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -70,6 +70,8 @@ class TransformerEncoderLayer(nn.Module):
             mask (torch.Tensor): Mask tensor for the input (#batch, time).
             pos_emb (torch.Tensor): just for interface compatibility
                 to ConformerEncoderLayer
+            mask_pad (torch.Tensor): does not used in transformer layer,
+                just for unified api with conformer.
             output_cache (torch.Tensor): Cache tensor of the output
                 (#batch, time2, size), time2 < time in x.
             cnn_cache (torch.Tensor): not used here, it's for interface
@@ -131,19 +133,18 @@ class ConformerEncoderLayer(nn.Module):
         conv_module (torch.nn.Module): Convolution module instance.
             `ConvlutionModule` instance can be used as the argument.
         dropout_rate (float): Dropout rate.
-        normalize_before (bool): Whether to use layer_norm before the first
-            block.
+        normalize_before (bool):
+            True: use layer_norm before each sub-block.
+            False: use layer_norm after each sub-block.
         concat_after (bool): Whether to concat attention layer's input and
             output.
-            if True, additional linear will be applied.
-                i.e. x -> x + linear(concat(x, att(x)))
-            if False, no additional linear will be applied.
-                i.e. x -> x + att(x)
+            True: x -> x + linear(concat(x, att(x)))
+            False: x -> x + att(x)
     """
     def __init__(
         self,
         size: int,
-        self_attn: int,
+        self_attn: torch.nn.Module,
         feed_forward: Optional[nn.Module] = None,
         feed_forward_macaron: Optional[nn.Module] = None,
         conv_module: Optional[nn.Module] = None,
@@ -180,15 +181,18 @@ class ConformerEncoderLayer(nn.Module):
         x: torch.Tensor,
         mask: torch.Tensor,
         pos_emb: torch.Tensor,
+        mask_pad: Optional[torch.Tensor] = None,
         output_cache: Optional[torch.Tensor] = None,
         cnn_cache: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Compute encoded features.
+
         Args:
             x (torch.Tensor): (#batch, time, size)
-            mask (torch.Tensor): Mask tensor for the input (#batch, time).
+            mask (torch.Tensor): Mask tensor for the input (#batch, time，time).
             pos_emb (torch.Tensor): positional encoding, must not be None
                 for ConformerEncoderLayer.
+            mask_pad (torch.Tensor): batch padding mask used for conv module.
             output_cache (torch.Tensor): Cache tensor of the output
                 (#batch, time2, size), time2 < time in x.
             cnn_cache (torch.Tensor): Convolution cache in conformer layer
@@ -224,7 +228,6 @@ class ConformerEncoderLayer(nn.Module):
             mask = mask[:, -chunk:, :]
 
         x_att = self.self_attn(x_q, x, x, pos_emb, mask)
-
         if self.concat_after:
             x_concat = torch.cat((x, x_att), dim=-1)
             x = residual + self.concat_linear(x_concat)
@@ -240,7 +243,7 @@ class ConformerEncoderLayer(nn.Module):
             residual = x
             if self.normalize_before:
                 x = self.norm_conv(x)
-            x, new_cnn_cache = self.conv_module(x, cnn_cache)
+            x, new_cnn_cache = self.conv_module(x, mask_pad, cnn_cache)
             x = residual + self.dropout(x)
 
             if not self.normalize_before:

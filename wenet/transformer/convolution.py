@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright 2020 Johns Hopkins University (Shinji Watanabe)
-#  Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
+# Copyright 2021 Mobvoi Inc. All Rights Reserved.
+# Author: di.wu@mobvoi.com (DI WU)
 """ConvolutionModule definition."""
 
 from typing import Optional, Tuple
@@ -18,6 +18,7 @@ class ConvolutionModule(nn.Module):
                  channels: int,
                  kernel_size: int = 15,
                  activation: nn.Module = nn.ReLU(),
+                 norm: str = "batch_norm",
                  causal: bool = False,
                  bias: bool = True):
         """Construct an ConvolutionModule object.
@@ -58,7 +59,15 @@ class ConvolutionModule(nn.Module):
             groups=channels,
             bias=bias,
         )
-        self.norm = nn.BatchNorm1d(channels)
+
+        assert norm in ['batch_norm', 'layer_norm']
+        if norm == "batch_norm":
+            self.use_layer_norm = False
+            self.norm = nn.BatchNorm1d(channels)
+        else:
+            self.use_layer_norm = True
+            self.norm = nn.LayerNorm(channels)
+
         self.pointwise_conv2 = nn.Conv1d(
             channels,
             channels,
@@ -72,11 +81,13 @@ class ConvolutionModule(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        cache: Optional[torch.Tensor] = None
+        mask_pad: Optional[torch.Tensor] = None,
+        cache: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Compute convolution module.
         Args:
             x (torch.Tensor): Input tensor (#batch, time, channels).
+            mask_pad (torch.Tensor): used for batch padding
             cache (torch.Tensor): left context cache, it is only
                 used in causal convolution
         Returns:
@@ -84,6 +95,11 @@ class ConvolutionModule(nn.Module):
         """
         # exchange the temporal dimension and the feature dimension
         x = x.transpose(1, 2)
+
+        # mask batch padding
+        if mask_pad is not None:
+            x.masked_fill_(~mask_pad, 0.0)
+
         if self.lorder > 0:
             if cache is None:
                 x = nn.functional.pad(x, (self.lorder, 0), 'constant', 0.0)
@@ -105,6 +121,14 @@ class ConvolutionModule(nn.Module):
 
         # 1D Depthwise Conv
         x = self.depthwise_conv(x)
+        if self.use_layer_norm:
+            x = x.transpose(1, 2)
         x = self.activation(self.norm(x))
+        if self.use_layer_norm:
+            x = x.transpose(1, 2)
         x = self.pointwise_conv2(x)
+        # mask batch padding
+        if mask_pad is not None:
+            x.masked_fill_(~mask_pad, 0.0)
+
         return x.transpose(1, 2), new_cache

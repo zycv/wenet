@@ -1,5 +1,16 @@
-# Copyright 2020 Mobvoi Inc. All Rights Reserved.
-# Author: binbinzhang@mobvoi.com (Binbin Zhang)
+# Copyright (c) 2020 Mobvoi Inc. (authors: Binbin Zhang, Xiaoyu Chen, Di Wu)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from __future__ import print_function
 
@@ -9,20 +20,16 @@ import logging
 import os
 import sys
 
-import yaml
 import torch
+import yaml
 from torch.utils.data import DataLoader
 
-from wenet.dataset.dataset import CollateFunc, AudioDataset
-from wenet.transformer.encoder import TransformerEncoder
-from wenet.transformer.encoder import ConformerEncoder
-from wenet.transformer.decoder import TransformerDecoder
-from wenet.transformer.ctc import CTC
-from wenet.transformer.asr_model import ASRModel
+from wenet.dataset.dataset import AudioDataset, CollateFunc
+from wenet.transformer.asr_model import init_asr_model
 from wenet.utils.checkpoint import load_checkpoint
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='training your network')
+    parser = argparse.ArgumentParser(description='recognize with your model')
     parser.add_argument('--config', required=True, help='config file')
     parser.add_argument('--test_data', required=True, help='test data file')
     parser.add_argument('--gpu',
@@ -30,7 +37,6 @@ if __name__ == '__main__':
                         default=-1,
                         help='gpu id for this rank, -1 for cpu')
     parser.add_argument('--checkpoint', required=True, help='checkpoint model')
-    parser.add_argument('--cmvn', default=None, help='global cmvn file')
     parser.add_argument('--dict', required=True, help='dict file')
     parser.add_argument('--beam_size',
                         type=int,
@@ -62,6 +68,11 @@ if __name__ == '__main__':
                                 <0: for decoding, use full chunk.
                                 >0: for decoding, use fixed chunk size as set.
                                 0: used for training, it's prohibited here''')
+    parser.add_argument('--num_decoding_left_chunks',
+                        type=int,
+                        default=-1,
+                        help='number of left chunks for decoding')
+
     parser.add_argument('--simulate_streaming',
                         action='store_true',
                         help='simulate streaming inference')
@@ -79,21 +90,23 @@ if __name__ == '__main__':
         sys.exit(1)
 
     with open(args.config, 'r') as fin:
-        configs = yaml.load(fin)
+        configs = yaml.load(fin, Loader=yaml.FullLoader)
 
     raw_wav = configs['raw_wav']
     # Init dataset and data loader
     # Init dataset and data loader
     test_collate_conf = copy.deepcopy(configs['collate_conf'])
     test_collate_conf['spec_aug'] = False
+    test_collate_conf['spec_sub'] = False
     test_collate_conf['feature_dither'] = False
     test_collate_conf['speed_perturb'] = False
-    test_collate_conf['wav_distortion_conf']['wav_distortion_rate'] = 0
+    if raw_wav:
+        test_collate_conf['wav_distortion_conf']['wav_distortion_rate'] = 0
     test_collate_func = CollateFunc(**test_collate_conf,
-                                    raw_wav=raw_wav,
-                                    cmvn=args.cmvn)
+                                    raw_wav=raw_wav)
     dataset_conf = configs.get('dataset_conf', {})
     dataset_conf['batch_size'] = args.batch_size
+    dataset_conf['batch_type'] = 'static'
     dataset_conf['sort'] = False
     test_dataset = AudioDataset(args.test_data, **dataset_conf, raw_wav=raw_wav)
     test_data_loader = DataLoader(test_dataset,
@@ -102,27 +115,8 @@ if __name__ == '__main__':
                                   batch_size=1,
                                   num_workers=0)
 
-    # Init transformer model
-    if raw_wav:
-        input_dim = configs['collate_conf']['feature_extraction_conf']['mel_bins']
-    else:
-        input_dim = test_dataset.input_dim
-    vocab_size = test_dataset.output_dim
-    encoder_type = configs.get('encoder', 'conformer')
-    if encoder_type == 'conformer':
-        encoder = ConformerEncoder(input_dim, **configs['encoder_conf'])
-    else:
-        encoder = TransformerEncoder(input_dim, **configs['encoder_conf'])
-    decoder = TransformerDecoder(vocab_size, encoder.output_size(),
-                                 **configs['decoder_conf'])
-    ctc = CTC(vocab_size, encoder.output_size())
-    model = ASRModel(
-        vocab_size=vocab_size,
-        encoder=encoder,
-        decoder=decoder,
-        ctc=ctc,
-        **configs['model_conf'],
-    )
+    # Init asr model from configs
+    model = init_asr_model(configs)
 
     # Load dict
     char_dict = {}
@@ -152,6 +146,7 @@ if __name__ == '__main__':
                     feats_lengths,
                     beam_size=args.beam_size,
                     decoding_chunk_size=args.decoding_chunk_size,
+                    num_decoding_left_chunks=args.num_decoding_left_chunks,
                     simulate_streaming=args.simulate_streaming)
                 hyps = [hyp.tolist() for hyp in hyps]
             elif args.mode == 'ctc_greedy_search':
@@ -159,6 +154,7 @@ if __name__ == '__main__':
                     feats,
                     feats_lengths,
                     decoding_chunk_size=args.decoding_chunk_size,
+                    num_decoding_left_chunks=args.num_decoding_left_chunks,
                     simulate_streaming=args.simulate_streaming)
             # ctc_prefix_beam_search and attention_rescoring only return one
             # result in List[int], change it to List[List[int]] for compatible
@@ -170,6 +166,7 @@ if __name__ == '__main__':
                     feats_lengths,
                     args.beam_size,
                     decoding_chunk_size=args.decoding_chunk_size,
+                    num_decoding_left_chunks=args.num_decoding_left_chunks,
                     simulate_streaming=args.simulate_streaming)
                 hyps = [hyp]
             elif args.mode == 'attention_rescoring':
@@ -179,6 +176,7 @@ if __name__ == '__main__':
                     feats_lengths,
                     args.beam_size,
                     decoding_chunk_size=args.decoding_chunk_size,
+                    num_decoding_left_chunks=args.num_decoding_left_chunks,
                     ctc_weight=args.ctc_weight,
                     simulate_streaming=args.simulate_streaming)
                 hyps = [hyp]

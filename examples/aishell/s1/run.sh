@@ -8,7 +8,7 @@
 # Use this to control how many gpu you use, It's 1-gpu training if you specify
 # just 1gpu, otherwise it's is multiple gpu training based on DDP in pytorch
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
-stage=0 # start from 0 if you need to start from data preparation
+stage=4 # start from 0 if you need to start from data preparation
 stop_stage=6
 # data
 data=/export/data/asr-data/OpenSLR/33/
@@ -33,7 +33,8 @@ checkpoint=
 # use average_checkpoint will get better result
 average_checkpoint=true
 decode_checkpoint=$dir/final.pt
-average_num=10
+average_num=20
+decode_modes="ctc_greedy_search ctc_prefix_beam_search attention attention_rescoring"
 
 . utils/parse_options.sh || exit 1;
 
@@ -104,8 +105,9 @@ if [ ${stage} -le 4 ] && [ ${stop_stage} -ge 4 ]; then
     num_gpus=$(echo $CUDA_VISIBLE_DEVICES | awk -F "," '{print NF}')
     # Use "nccl" if it works, otherwise use "gloo"
     dist_backend="nccl"
+    cp ${feat_dir}/${train_set}/global_cmvn $dir
     cmvn_opts=
-    $cmvn && (cp ${feat_dir}/${train_set}/global_cmvn $dir;cmvn_opts="--cmvn ${dir}/global_cmvn")
+    $cmvn && cmvn_opts="--cmvn ${dir}/global_cmvn"
     # train.py will write $train_config to $dir/train.yaml with model input
     # and output dimension, train.yaml will be used for inference or model
     # export later
@@ -131,8 +133,6 @@ fi
 
 if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
     # Test model, please specify the model you want to test by --checkpoint
-    cmvn_opts=
-    $cmvn && cmvn_opts="--cmvn ${dir}/global_cmvn"
     # TODO, Add model average here
     mkdir -p $dir/test
     if [ ${average_checkpoint} == true ]; then
@@ -148,7 +148,7 @@ if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
     # -1 for full chunk
     decoding_chunk_size=
     ctc_weight=0.5
-    for mode in ctc_greedy_search ctc_prefix_beam_search attention attention_rescoring; do
+    for mode in ${decode_modes}; do
     {
         test_dir=$dir/test_${mode}
         mkdir -p $test_dir
@@ -163,9 +163,8 @@ if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
             --dict $dict \
             --ctc_weight $ctc_weight \
             --result_file $test_dir/text \
-            $cmvn_opts \
             ${decoding_chunk_size:+--decoding_chunk_size $decoding_chunk_size}
-         python2 tools/compute-wer.py --char=1 --v=1 \
+         python tools/compute-wer.py --char=1 --v=1 \
             $feat_dir/test/text $test_dir/text > $test_dir/wer
     } &
     done

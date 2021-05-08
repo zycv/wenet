@@ -40,7 +40,6 @@ raw_wav: false
 # feature extraction
 collate_conf:
     # spec level config
-    # spec_swap: false
     feature_dither: 0.0 # add dither [-feature_dither,feature_dither] on fbank feature
     spec_aug: true
     spec_aug_conf:
@@ -50,12 +49,17 @@ collate_conf:
         max_t: 50
         max_f: 10
         max_w: 80
+    spec_sub: true
+    spec_sub_conf:
+        num_t_sub: 3
+        max_t: 20
 
 # dataset related
 dataset_conf:
     max_length: 10240
     min_length: 0
     batch_type: 'static' # static or dynamic
+    # the size of batch_size should be set according to your gpu memory size, here we used titan xp gpu whose memory size is 12GB
     batch_size: 20
     sort: true
 
@@ -66,7 +70,7 @@ log_interval: 100
 
 optim: adam
 optim_conf:
-    lr: 0.001
+    lr: 0.002
 scheduler: warmuplr     # pytorch v1.1.0+ required
 scheduler_conf:
     warmup_steps: 25000

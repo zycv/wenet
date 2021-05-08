@@ -42,14 +42,33 @@ def add_sos_eos(ys_pad: torch.Tensor, sos: int, eos: int,
                 ignore_id: int) -> Tuple[torch.Tensor, torch.Tensor]:
     """Add <sos> and <eos> labels.
 
-    :param torch.Tensor ys_pad: batch of padded target sequences (B, Lmax)
-    :param int sos: index of <sos>
-    :param int eos: index of <eeos>
-    :param int ignore_id: index of padding
-    :return: padded tensor (B, Lmax)
-    :rtype: torch.Tensor
-    :return: padded tensor (B, Lmax)
-    :rtype: torch.Tensor
+    Args:
+        ys_pad (torch.Tensor): batch of padded target sequences (B, Lmax)
+        sos (int): index of <sos>
+        eos (int): index of <eeos>
+        ignore_id (int): index of padding
+
+    Returns:
+        ys_in (torch.Tensor) : (B, Lmax + 1)
+        ys_out (torch.Tensor) : (B, Lmax + 1)
+
+    Examples:
+        >>> sos_id = 10
+        >>> eos_id = 11
+        >>> ignore_id = -1
+        >>> ys_pad
+        tensor([[ 1,  2,  3,  4,  5],
+                [ 4,  5,  6, -1, -1],
+                [ 7,  8,  9, -1, -1]], dtype=torch.int32)
+        >>> ys_in,ys_out=add_sos_eos(ys_pad, sos_id , eos_id, ignore_id)
+        >>> ys_in
+        tensor([[10,  1,  2,  3,  4,  5],
+                [10,  4,  5,  6, 11, 11],
+                [10,  7,  8,  9, 11, 11]])
+        >>> ys_out
+        tensor([[ 1,  2,  3,  4,  5, 11],
+                [ 4,  5,  6, 11, -1, -1],
+                [ 7,  8,  9, 11, -1, -1]])
     """
     _sos = torch.tensor([sos],
                         dtype=torch.long,
@@ -102,6 +121,17 @@ def get_activation(act):
     }
 
     return activation_funcs[act]()
+
+
+def get_subsample(config):
+    input_layer = config["encoder_conf"]["input_layer"]
+    assert input_layer in ["conv2d", "conv2d6", "conv2d8"]
+    if input_layer == "conv2d":
+        return 4
+    elif input_layer == "conv2d6":
+        return 6
+    elif input_layer == "conv2d8":
+        return 8
 
 
 def remove_duplicates_and_blank(hyp: List[int]) -> List[int]:
