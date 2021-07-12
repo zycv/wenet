@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 
 project(kaldi)
 
+# include_directories() is called in the root CMakeLists.txt
+
 add_library(kaldi-base
 base/kaldi-error.cc
 base/kaldi-math.cc
@@ -52,8 +54,11 @@ fstminimizeencoded
 fsttablecompose
 )
 
+if(NOT MSVC)
+  # dl is for dynamic linking, otherwise there is a linking error on linux
+  link_libraries(dl)
+endif()
 foreach(name IN LISTS FST_BINS)
   add_executable(${name} fstbin/${name}.cc)
-  # dl is for dynamic linking, otherwise there is a linking error on linux
-  target_link_libraries(${name} PUBLIC kaldi-fstext dl)
+  target_link_libraries(${name} PUBLIC kaldi-fstext)
 endforeach()

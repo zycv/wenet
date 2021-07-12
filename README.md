@@ -1,7 +1,10 @@
 # WeNet
 
+[**中文版**](https://github.com/wenet-e2e/wenet/blob/main/README_CN.md)
+
 [![License](https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python-Version](https://img.shields.io/badge/Python-3.7%7C3.8-brightgreen)](https://github.com/wenet-e2e/wenet)
+
 
 [**Docs**](https://wenet-e2e.github.io/wenet/)
 | [**Tutorial**](https://wenet-e2e.github.io/wenet/tutorial.html)
@@ -28,9 +31,9 @@ to reduce the effort of productionizing E2E models, and to explore better E2E mo
   with clean and simple code. It is all based on PyTorch and its corresponding ecosystem. It has no dependency on Kaldi,
   which simplifies installation and usage.
 
-## Pretrained Models & Performance Benchmark
+## Performance Benchmark
 
- We release various pretrained models. Please see `examples/$dataset/s0/README.md` for model download links and WeNet benchmark on different speech datasets.
+Please see `examples/$dataset/s0/README.md` for benchmark on different speech datasets.
 * [AIShell-1](examples/aishell/s0/README.md)
 * [AIShell-2](examples/aishell2/s0/README.md)
 * [LibriSpeech](examples/librispeech/s0/README.md)
@@ -98,11 +101,13 @@ If you can not access the QR image, please access it on [gitee](https://gitee.co
 ## Citations
 
 ``` bibtex
-@article{zhang2021wenet,
-  title={WeNet: Production First and Production Ready End-to-End Speech Recognition Toolkit},
-  author={Zhang, Binbin and Wu, Di and Yang, Chao and Chen, Xiaoyu and Peng, Zhendong and Wang, Xiangming and Yao, Zhuoyuan and Wang, Xiong and Yu, Fan and Xie, Lei and others},
-  journal={arXiv preprint arXiv:2102.01547},
-  year={2021}
+@inproceedings{yao2021wenet,
+  title={WeNet: Production oriented Streaming and Non-streaming End-to-End Speech Recognition Toolkit},
+  author={Yao, Zhuoyuan and Wu, Di and Wang, Xiong and Zhang, Binbin and Yu, Fan and Yang, Chao and Peng, Zhendong and Chen, Xiaoyu and Xie, Lei and Lei, Xin},
+  booktitle={Proc. Interspeech},
+  year={2021},
+  address={Brno, Czech Republic }
+  organization={IEEE}
 }
 
 @article{zhang2020unified,
@@ -110,5 +115,12 @@ If you can not access the QR image, please access it on [gitee](https://gitee.co
   author={Zhang, Binbin and Wu, Di and Yao, Zhuoyuan and Wang, Xiong and Yu, Fan and Yang, Chao and Guo, Liyong and Hu, Yaguang and Xie, Lei and Lei, Xin},
   journal={arXiv preprint arXiv:2012.05481},
   year={2020}
+}
+
+@article{wu2021u2++,
+  title={U2++: Unified Two-pass Bidirectional End-to-end Model for Speech Recognition},
+  author={Wu, Di and Zhang, Binbin and Yang, Chao and Peng, Zhendong and Xia, Wenjing and Chen, Xiaoyu and Lei, Xin},
+  journal={arXiv preprint arXiv:2106.05642},
+  year={2021}
 }
 ```
